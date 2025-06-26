@@ -35,7 +35,7 @@ app.add_middleware(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080","https://2b7a-106-51-51-220.ngrok-free.app"],  # Update as needed
+    allow_origins=["http://localhost:8080","https://6cea-106-51-51-220.ngrok-free.app"],  # Update as needed
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
