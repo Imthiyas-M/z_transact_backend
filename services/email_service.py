@@ -251,8 +251,8 @@ from email.utils import parsedate_to_datetime
 
 from db.models import EmailConnection, EmailSyncSettings, EmailRecord
 from db.database import SessionLocal
-from services.crypto_utils import decrypt_password
-from .utils import ensure_dirs, hash_file
+from utils.crypto_utils import decrypt_password
+from utils.utils import ensure_dirs, hash_file
 
 
 def decode_mime(text):
@@ -302,7 +302,7 @@ def process_email_account(email_id: str, save_dir: str, temp_dir: str, hash_path
             raise ValueError("Missing email password")
 
         if conn_info.password.startswith("gAAAA"):  # indicative of Fernet token
-            from services.crypto_utils import decrypt_password
+            from utils.crypto_utils import decrypt_password
             password = decrypt_password(password)
 
         conn = connect_imap(conn_info.imap_config, conn_info.email, password)

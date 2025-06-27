@@ -495,8 +495,266 @@ older version -->  25/06/25
 #     } for conn in connections]
 
 
+"""
+older version -->  26/06/25
 
-# routers/email_router.py
+"""
+
+
+
+
+
+
+# # routers/email_router.py
+# from fastapi import APIRouter, Depends, HTTPException
+# from pydantic import BaseModel
+# from sqlalchemy.orm import Session
+# from uuid import uuid4
+# from datetime import datetime
+# import imaplib, smtplib
+# from enum import Enum
+# from db.database import get_db
+# from db.models import EmailConnection, EmailSyncSettings, User
+# from services.crypto_utils import encrypt_password
+# from services.email_service import process_email_account
+# from utils.dependencies import get_current_user
+# from core.custom_exception import CustomAPIException
+# from sqlalchemy import create_engine
+# from db.models import Base
+# from db.database import engine
+#
+# Base.metadata.create_all(bind=engine)
+#
+# router = APIRouter()
+#
+# class ConnectionStatus(str, Enum):
+#     CONNECTED = "connected"
+#     DISCONNECTED = "disconnected"
+#     SYNCING = "syncing"
+#     FAILED = "failed"
+#
+# class ConnectPayload(BaseModel):
+#     email: str
+#     password: str
+#     imap: dict
+#     smtp: dict
+#
+# class SyncPayload(BaseModel):
+#     email: str
+#     auto_sync: bool
+#     email_folders: list[str]
+#     email_documents: list[str]
+#     sync_interval: int
+#
+# @router.post("/api/email/connect")
+# def api_connect(p: ConnectPayload, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+#     try:
+#         im = imaplib.IMAP4_SSL if p.imap.get("use_ssl", True) else imaplib.IMAP4
+#         conn = im(p.imap["host"], p.imap["port"]); conn.login(p.email, p.password); conn.logout()
+#
+#         sm = smtplib.SMTP_SSL if p.smtp.get("use_ssl", True) else smtplib.SMTP
+#         sconn = sm(p.smtp["host"], p.smtp["port"]); sconn.login(p.email, p.password); sconn.quit()
+#     except Exception as e:
+#         raise CustomAPIException("E_EMAIL_CONN", "Failed to connect", 400, {"err": str(e)})
+#
+#     conn_id = uuid4()
+#     ec = EmailConnection(
+#         id=conn_id,
+#         user_email=user.email,
+#         email=p.email,
+#         provider="custom",
+#         connection_type="imap",
+#         password=encrypt_password(p.password),
+#         imap_config=p.imap,
+#         smtp_config=p.smtp,
+#         status=ConnectionStatus.CONNECTED
+#     )
+#     db.add(ec); db.commit()
+#     return {"message": "Sync settings saved", "sync_details": {"auto_sync": payload.auto_sync, "folders": payload.email_folders, "interval": payload.sync_interval}}
+#
+# # @router.post("/api/sync/email")
+# # # def api_sync(p: SyncPayload, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+# # #     ec = db.query(EmailConnection).filter_by(email=p.email, user_email=user.email).first()
+# # #     if not ec:
+# # #         raise HTTPException(403, "Unauthorized")
+# # #     ss = EmailSyncSettings(
+# # #         connection_id=ec.id,
+# # #         auto_sync=p.auto_sync,
+# # #         email_folders=p.email_folders,
+# # #         email_documents=p.email_documents,
+# # #         sync_interval=p.sync_interval
+# # #     )
+# # #     db.merge(ss); db.commit()
+# # #     return {"success": True}
+# # #
+# @router.post("/api/sync/email")
+# def api_sync(sync_payload: SyncPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+#     # ... your logic to identify the connection_id first
+#
+#     connection = db.query(EmailConnection).filter_by(email=sync_payload.email, user_email=current_user.email).first()
+#     if not connection:
+#         raise HTTPException(status_code=404, detail="Email connection not found.")
+#
+#     existing_ss = db.query(EmailSyncSettings).filter_by(connection_id=connection.id).first()
+#
+#     if existing_ss:
+#         # Update existing record
+#         existing_ss.auto_sync = sync_payload.auto_sync
+#         existing_ss.email_folders = sync_payload.email_folders
+#         existing_ss.email_documents = sync_payload.email_documents
+#         existing_ss.sync_interval = sync_payload.sync_interval
+#     else:
+#         # Create new one
+#         new_ss = EmailSyncSettings(
+#             connection_id=connection.id,
+#             auto_sync=sync_payload.auto_sync,
+#             email_folders=sync_payload.email_folders,
+#             email_documents=sync_payload.email_documents,
+#             sync_interval=sync_payload.sync_interval,
+#         )
+#         db.add(new_ss)
+#
+#     db.commit()
+#     return {
+#                 "message": "Sync settings saved",
+#                 "sync_details": {
+#                     "auto_sync": payload.auto_sync,
+#                     "folders": payload.email_folders,
+#                     "interval": payload.sync_interval
+#                 }
+#             }
+#
+#
+# # @router.post("/api/sync/run/{email}")
+# # def run_sync(email: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+# #     # ec = db.query(EmailConnection).filter_by(email=email, user_email=user.email).first()
+# #     ec = db.query(EmailConnection).filter_by(email=email, user_email=user.email).first()
+# #     ss = db.query(EmailSyncSettings).filter_by(connection_id=ec.id).first() if ec else None
+# #     if not ec or not ss:
+# #         raise HTTPException(404, "Missing")
+# #     if not ss.auto_sync:
+# #         raise HTTPException(400, "Auto-sync disabled")
+# #
+# #     ec.status = ConnectionStatus.SYNCING; db.commit()
+# #     result = process_email_account(str(ec.id), "/data/raw", "temp", "hashes.txt", None)
+# #     ec.status = ConnectionStatus.CONNECTED
+# #     ss.last_sync = datetime.utcnow()
+# #     db.commit()
+# #     return result
+#
+# @router.post("/api/sync/run/{email}")
+# def run_sync(email: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+#     ec = db.query(EmailConnection).filter_by(email=email, user_email=user.email).first()
+#     ss = db.query(EmailSyncSettings).filter_by(connection_id=ec.id).first() if ec else None
+#
+#     if not ec or not ss:
+#         raise HTTPException(404, "Missing")
+#     if not ss.auto_sync:
+#         raise HTTPException(400, "Auto-sync disabled")
+#
+#     ec.status = ConnectionStatus.SYNCING
+#     db.commit()
+#
+#     try:
+#         result = process_email_account(str(ec.id), "Output", "temp", "hashes.txt", None)
+#     finally:
+#         ec.status = ConnectionStatus.CONNECTED
+#         ss.last_sync = datetime.utcnow()
+#         db.commit()
+#
+#     return {
+#         "message": "Sync completed successfully",
+#         "email": ec.email,
+#         "processed": result["processed_count"],
+#         "skipped": result["skipped_count"],
+#         "records": result["records"]
+#     }
+#
+#
+# # ----------------------
+# # Get Email Accounts by User
+# # ----------------------
+# # @router.get("/api/email/user/{email}")
+# # def get_emails_by_user(email: str, db: Session = Depends(get_db) , user: User = Depends(get_current_user)):
+# #     # Fetch all email connections for the user
+# #     # connections = db.query(EmailConnection).filter_by(user_email=email).all()
+# #     #
+# #     # if not connections:
+# #     #     raise HTTPException(status_code=404, detail="No email connections found for user")
+# #     #
+# #     # connection_ids = [conn.id for conn in connections]
+# #
+# #     ec = db.query(EmailConnection).filter_by(email=email, user_email=user.email).first()
+# #     ss = db.query(EmailSyncSettings).filter_by(connection_id=ec.id).first() if ec else None
+# #
+# #     if not ec or not ss:
+# #         raise HTTPException(404, "Missing")
+# #
+# #     # Fetch sync settings for these connections
+# #     settings = db.query(EmailSyncSettings).filter(
+# #         EmailSyncSettings.connection_id.in_(connection_ids)
+# #     ).all()
+# #
+# #     settings_map = {s.connection_id: s for s in settings}
+# #
+# #     response = []
+# #     for conn in connections:
+# #         sync = settings_map.get(conn.id)
+# #         response.append({
+# #             "provider": "custom",
+# #             "email": conn.email,
+# #             "user_id": conn.user_email,
+# #             "status": conn.status,
+# #             "lastSync": sync.last_sync if sync else None,
+# #             "syncInterval": sync.sync_interval if sync else None,
+# #             "enabledFolders": sync.email_folders if sync else [],
+# #             "enabledDocuments": sync.email_documents if sync else [],
+# #             "autoSync": sync.auto_sync if sync else False
+# #         })
+# #
+# #     return response
+#
+#
+#
+# @router.get("/api/email/user/{email}")
+# def get_email_connection_details(email: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+#     # Fetch a single email connection that matches the given email and is owned by the current user
+#     ec = db.query(EmailConnection).filter_by(email=email, user_email=user.email).first()
+#     if not ec:
+#         raise HTTPException(status_code=404, detail="Email connection not found for this user")
+#
+#     ss = db.query(EmailSyncSettings).filter_by(connection_id=ec.id).first()
+#
+#     return {
+#         "provider": "custom",
+#         "email": ec.email,
+#         "user_id": ec.user_email,
+#         "status": ec.status,
+#         "lastSync": ss.last_sync if ss else None,
+#         "syncInterval": ss.sync_interval if ss else None,
+#         "enabledFolders": ss.email_folders if ss else [],
+#         "enabledDocuments": ss.email_documents if ss else [],
+#         "autoSync": ss.auto_sync if ss else False
+#     }
+#
+#
+#
+#
+# @router.get("/api/email/user")
+# def get_emails_by_user(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+#     conns = db.query(EmailConnection).filter_by(user_email=user.email).all()
+#     out = []
+#     for c in conns:
+#         ss = c.sync_settings
+#         out.append({
+#             "email": c.email,
+#             "status": c.status,
+#             "lastSync": ss.last_sync if ss else None,
+#             "autoSync": ss.auto_sync if ss else False
+#         })
+#     return out
+
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -506,7 +764,7 @@ import imaplib, smtplib
 from enum import Enum
 from db.database import get_db
 from db.models import EmailConnection, EmailSyncSettings, User
-from services.crypto_utils import encrypt_password
+from utils.crypto_utils import encrypt_password
 from services.email_service import process_email_account
 from utils.dependencies import get_current_user
 from core.custom_exception import CustomAPIException
@@ -518,17 +776,20 @@ Base.metadata.create_all(bind=engine)
 
 router = APIRouter()
 
+
 class ConnectionStatus(str, Enum):
     CONNECTED = "connected"
     DISCONNECTED = "disconnected"
     SYNCING = "syncing"
     FAILED = "failed"
 
+
 class ConnectPayload(BaseModel):
     email: str
     password: str
     imap: dict
     smtp: dict
+
 
 class SyncPayload(BaseModel):
     email: str
@@ -537,17 +798,51 @@ class SyncPayload(BaseModel):
     email_documents: list[str]
     sync_interval: int
 
+
 @router.post("/api/email/connect")
-def api_connect(p: ConnectPayload, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def api_connect(
+        p: ConnectPayload,
+        db: Session = Depends(get_db),
+        user: User = Depends(get_current_user)
+):
+    # 1. Check if this email is already connected by this user
+    existing = db.query(EmailConnection).filter_by(email=p.email, user_email=user.email).first()
+    if existing:
+        raise CustomAPIException(
+            "EMAIL_ALREADY_CONNECTED",
+            f"{p.email} is already connected by you.",
+            400,
+            {"email": p.email}
+        )
+
+    # 2. Validate IMAP and SMTP credentials
     try:
-        im = imaplib.IMAP4_SSL if p.imap.get("use_ssl", True) else imaplib.IMAP4
-        conn = im(p.imap["host"], p.imap["port"]); conn.login(p.email, p.password); conn.logout()
-
-        sm = smtplib.SMTP_SSL if p.smtp.get("use_ssl", True) else smtplib.SMTP
-        sconn = sm(p.smtp["host"], p.smtp["port"]); sconn.login(p.email, p.password); sconn.quit()
+        imap_class = imaplib.IMAP4_SSL if p.imap.get("use_ssl", True) else imaplib.IMAP4
+        imap_conn = imap_class(p.imap["host"], p.imap["port"])
+        imap_conn.login(p.email, p.password)
+        imap_conn.logout()
     except Exception as e:
-        raise CustomAPIException("E_EMAIL_CONN", "Failed to connect", 400, {"err": str(e)})
+        raise CustomAPIException(
+            "IMAP_CONNECT_FAILED",
+            "IMAP authentication failed.",
+            400,
+            {"error": str(e)}
+        )
 
+    try:
+        smtp_class = smtplib.SMTP_SSL if p.smtp.get("use_ssl", True) else smtplib.SMTP
+        smtp_conn = smtp_class(p.smtp["host"], p.smtp["port"])
+        smtp_conn.login(p.email, p.password)
+        smtp_conn.quit()
+    except Exception as e:
+        raise CustomAPIException(
+            "SMTP_CONNECT_FAILED",
+            "SMTP authentication failed.",
+            400,
+            {"error": str(e)}
+        )
+
+    # 3. Create and store EmailConnection
     conn_id = uuid4()
     ec = EmailConnection(
         id=conn_id,
@@ -560,24 +855,18 @@ def api_connect(p: ConnectPayload, db: Session = Depends(get_db), user: User = D
         smtp_config=p.smtp,
         status=ConnectionStatus.CONNECTED
     )
-    db.add(ec); db.commit()
-    return {"message": "Sync settings saved", "sync_details": {"auto_sync": payload.auto_sync, "folders": payload.email_folders, "interval": payload.sync_interval}}
 
-# @router.post("/api/sync/email")
-# # def api_sync(p: SyncPayload, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-# #     ec = db.query(EmailConnection).filter_by(email=p.email, user_email=user.email).first()
-# #     if not ec:
-# #         raise HTTPException(403, "Unauthorized")
-# #     ss = EmailSyncSettings(
-# #         connection_id=ec.id,
-# #         auto_sync=p.auto_sync,
-# #         email_folders=p.email_folders,
-# #         email_documents=p.email_documents,
-# #         sync_interval=p.sync_interval
-# #     )
-# #     db.merge(ss); db.commit()
-# #     return {"success": True}
-# #
+    db.add(ec)
+    db.commit()
+
+    return {
+        "success": True,
+        "email": p.email,
+        "email_id": str(conn_id),
+        "provider": "custom"
+    }
+
+
 @router.post("/api/sync/email")
 def api_sync(sync_payload: SyncPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # ... your logic to identify the connection_id first
@@ -607,31 +896,14 @@ def api_sync(sync_payload: SyncPayload, db: Session = Depends(get_db), current_u
 
     db.commit()
     return {
-                "message": "Sync settings saved",
-                "sync_details": {
-                    "auto_sync": payload.auto_sync,
-                    "folders": payload.email_folders,
-                    "interval": payload.sync_interval
-                }
-            }
+        "message": "Sync settings saved",
+        "sync_details": {
+            "auto_sync": sync_payload.auto_sync,
+            "folders": sync_payload.email_folders,
+            "interval": sync_payload.sync_interval
+        }
+    }
 
-
-# @router.post("/api/sync/run/{email}")
-# def run_sync(email: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-#     # ec = db.query(EmailConnection).filter_by(email=email, user_email=user.email).first()
-#     ec = db.query(EmailConnection).filter_by(email=email, user_email=user.email).first()
-#     ss = db.query(EmailSyncSettings).filter_by(connection_id=ec.id).first() if ec else None
-#     if not ec or not ss:
-#         raise HTTPException(404, "Missing")
-#     if not ss.auto_sync:
-#         raise HTTPException(400, "Auto-sync disabled")
-#
-#     ec.status = ConnectionStatus.SYNCING; db.commit()
-#     result = process_email_account(str(ec.id), "/data/raw", "temp", "hashes.txt", None)
-#     ec.status = ConnectionStatus.CONNECTED
-#     ss.last_sync = datetime.utcnow()
-#     db.commit()
-#     return result
 
 @router.post("/api/sync/run/{email}")
 def run_sync(email: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
@@ -662,51 +934,6 @@ def run_sync(email: str, db: Session = Depends(get_db), user: User = Depends(get
     }
 
 
-# ----------------------
-# Get Email Accounts by User
-# ----------------------
-# @router.get("/api/email/user/{email}")
-# def get_emails_by_user(email: str, db: Session = Depends(get_db) , user: User = Depends(get_current_user)):
-#     # Fetch all email connections for the user
-#     # connections = db.query(EmailConnection).filter_by(user_email=email).all()
-#     #
-#     # if not connections:
-#     #     raise HTTPException(status_code=404, detail="No email connections found for user")
-#     #
-#     # connection_ids = [conn.id for conn in connections]
-#
-#     ec = db.query(EmailConnection).filter_by(email=email, user_email=user.email).first()
-#     ss = db.query(EmailSyncSettings).filter_by(connection_id=ec.id).first() if ec else None
-#
-#     if not ec or not ss:
-#         raise HTTPException(404, "Missing")
-#
-#     # Fetch sync settings for these connections
-#     settings = db.query(EmailSyncSettings).filter(
-#         EmailSyncSettings.connection_id.in_(connection_ids)
-#     ).all()
-#
-#     settings_map = {s.connection_id: s for s in settings}
-#
-#     response = []
-#     for conn in connections:
-#         sync = settings_map.get(conn.id)
-#         response.append({
-#             "provider": "custom",
-#             "email": conn.email,
-#             "user_id": conn.user_email,
-#             "status": conn.status,
-#             "lastSync": sync.last_sync if sync else None,
-#             "syncInterval": sync.sync_interval if sync else None,
-#             "enabledFolders": sync.email_folders if sync else [],
-#             "enabledDocuments": sync.email_documents if sync else [],
-#             "autoSync": sync.auto_sync if sync else False
-#         })
-#
-#     return response
-
-
-
 @router.get("/api/email/user/{email}")
 def get_email_connection_details(email: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     # Fetch a single email connection that matches the given email and is owned by the current user
@@ -729,18 +956,25 @@ def get_email_connection_details(email: str, db: Session = Depends(get_db), user
     }
 
 
-
-
 @router.get("/api/email/user")
 def get_emails_by_user(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     conns = db.query(EmailConnection).filter_by(user_email=user.email).all()
     out = []
+
     for c in conns:
-        ss = c.sync_settings
+        ss = c.sync_settings  # via relationship
         out.append({
+            "provider": c.provider,
             "email": c.email,
+            "user_id": c.user_email,
             "status": c.status,
+            "email_id": str(c.id),
             "lastSync": ss.last_sync if ss else None,
+            "syncInterval": ss.sync_interval if ss else None,
+            "enabledFolders": ss.email_folders if ss else [],
+            "enabledDocuments": ss.email_documents if ss else [],
             "autoSync": ss.auto_sync if ss else False
         })
+
     return out
+

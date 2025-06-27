@@ -1,6 +1,7 @@
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
+import os, hashlib
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = "zLiPd1TMs5GtHM4x89ucbc3VW5LmtqiOjgdz15fHyMU"
@@ -34,6 +35,16 @@ def verify_session_token(token: str):
     except JWTError:
         return None
 
+def ensure_dirs(*paths):
+    for p in paths:
+        os.makedirs(p, exist_ok=True)
+
+def hash_file(path):
+    hasher = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 

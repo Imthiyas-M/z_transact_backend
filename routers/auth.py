@@ -257,9 +257,16 @@ def signup(user: UserCreate, response: Response, db: Session = Depends(get_db)):
     db.add(db_user); db.commit(); db.refresh(db_user)
 
     token = create_session_token(db_user.email, db_user.role)
+
+    # response.set_cookie(
+    #     key=COOKIE_NAME, value=token,
+    #     httponly=True, secure=True, samesite="None"
+    #
+    # )
+
     response.set_cookie(
         key=COOKIE_NAME, value=token,
-        httponly=True, secure=True, samesite="None"
+        httponly=True, samesite="Lax"
     )
     return {"message": "Signup successful", "email": db_user.email, "role": db_user.role}
 
@@ -270,9 +277,14 @@ def login(user: UserLogin, response: Response, db: Session = Depends(get_db)):
         raise CustomAPIException("E_AUTH_FAILED", "Invalid credentials", status_code=401)
 
     token = create_session_token(db_user.email, db_user.role)
+    # response.set_cookie(
+    #     key=COOKIE_NAME, value=token,
+    #     httponly=True, secure=True, samesite="None"
+    #
+    # )
     response.set_cookie(
         key=COOKIE_NAME, value=token,
-        httponly=True, secure=True, samesite="None"
+        httponly=True, samesite="Lax"
     )
     return {"message": "Login successful", "email": db_user.email, "role": db_user.role}
 

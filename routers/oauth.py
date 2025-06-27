@@ -398,18 +398,118 @@ older version -->  25/06/25
 # #     }
 
 
+"""
+older version -->  26/06/25
+
+"""
 
 
 
-# routers/oauth.py
-import os, requests
+# # routers/oauth.py
+# import os, requests
+# from fastapi import APIRouter, Depends, HTTPException, Response
+# from pydantic import BaseModel
+# from sqlalchemy.orm import Session
+# from db.database import SessionLocal
+# from db.models import User
+# from utils.utils import create_session_token
+# from sqlalchemy import create_engine
+# from db.models import Base
+# from db.database import engine
+#
+# Base.metadata.create_all(bind=engine)
+#
+# router = APIRouter()
+# COOKIE_NAME = "session_token"
+#
+# class OAuthRequest(BaseModel):
+#     provider: str
+#     code: str
+#     code_verifier: str | None = None
+#
+# def get_db():
+#     db = SessionLocal()
+#     try: yield db
+#     finally: db.close()
+#
+# @router.post("/oauth")
+# def oauth_login(req: OAuthRequest, response: Response, db: Session = Depends(get_db)):
+#     prov, code, verifier = req.provider.lower(), req.code, req.code_verifier
+#     if prov not in ("google", "microsoft"):
+#         raise HTTPException(400, "Unsupported provider")
+#
+#     data = handle_google(code) if prov == "google" else handle_microsoft(code, verifier)
+#     if not data or not data.get("email"):
+#         raise HTTPException(400, "OAuth failed")
+#
+#     email, name = data["email"], data.get("name") or email.split("@")[0]
+#     user = db.query(User).filter_by(email=email).first()
+#     if not user:
+#         user = User(email=email, username=name, provider=prov, role="user")
+#         db.add(user); db.commit(); db.refresh(user)
+#
+#     token = create_session_token(user.email, user.role)
+#     response.set_cookie(
+#         key=COOKIE_NAME, value=token,
+#         httponly=True, secure=True, samesite="None"
+#     )
+#
+#
+#     # return {"success": True, "email": user.email}
+#     return {
+#             "message": f"Login via {provider} successful",
+#             "email": user.email,
+#             "role": user.role
+#         }
+#
+# def handle_google(code):
+#     resp = requests.post("https://oauth2.googleapis.com/token", data={
+#         "code": code,
+#         "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+#         "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+#         "redirect_uri": os.getenv("GOOGLE_REDIRECT_URI"),
+#         "grant_type": "authorization_code"
+#     })
+#     if not resp.ok:
+#         return None
+#     idt = resp.json().get("id_token")
+#     info = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={idt}")
+#     return info.json() if info.ok else None
+#
+# def handle_microsoft(code, verifier=None):
+#     data = {
+#         "client_id": os.getenv("MICROSOFT_CLIENT_ID"),
+#         "grant_type": "authorization_code",
+#         "code": code,
+#         "redirect_uri": os.getenv("MICROSOFT_REDIRECT_URI"),
+#         "client_secret": os.getenv("MICROSOFT_CLIENT_SECRET"),
+#         "code_verifier": verifier,
+#     }
+#     # if verifier:
+#     #     data["code_verifier"] = verifier
+#     # else:
+#     #     data["client_secret"] = os.getenv("MICROSOFT_CLIENT_SECRET")
+#     resp = requests.post("https://login.microsoftonline.com/common/oauth2/v2.0/token", data=data)
+#     if not resp.ok:
+#         return None
+#     token = resp.json().get("access_token")
+#     me = requests.get("https://graph.microsoft.com/v1.0/me", headers={"Authorization": f"Bearer {token}"})
+#     return me.json() if me.ok else None
+
+
+
+
+
+
+import os
+from typing import Optional
+import requests
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from db.database import SessionLocal
 from db.models import User
 from utils.utils import create_session_token
-from sqlalchemy import create_engine
 from db.models import Base
 from db.database import engine
 
@@ -418,45 +518,133 @@ Base.metadata.create_all(bind=engine)
 router = APIRouter()
 COOKIE_NAME = "session_token"
 
+
+# DB Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# Request Schema
 class OAuthRequest(BaseModel):
     provider: str
     code: str
-    code_verifier: str | None = None
+    code_verifier: Optional[str] = None
 
-def get_db():
-    db = SessionLocal()
-    try: yield db
-    finally: db.close()
 
 @router.post("/oauth")
-def oauth_login(req: OAuthRequest, response: Response, db: Session = Depends(get_db)):
-    prov, code, verifier = req.provider.lower(), req.code, req.code_verifier
-    if prov not in ("google", "microsoft"):
+def oauth_login(
+        req: OAuthRequest,
+        response: Response,
+        db: Session = Depends(get_db)
+):
+    provider = req.provider.lower()
+    code = req.code
+    verifier = req.code_verifier
+
+    if provider not in ("google", "microsoft"):
         raise HTTPException(400, "Unsupported provider")
 
-    data = handle_google(code) if prov == "google" else handle_microsoft(code, verifier)
-    if not data or not data.get("email"):
+    # Handle OAuth for both providers
+    data = handle_google(code) if provider == "google" else handle_microsoft(code, verifier)
+
+    if not data:
         raise HTTPException(400, "OAuth failed")
 
-    email, name = data["email"], data.get("name") or email.split("@")[0]
+    # Handle possible email keys from Microsoft
+    email = data.get("email") or data.get("mail") or data.get("userPrincipalName")
+    if not email:
+        raise HTTPException(400, "No email found from provider")
+
+    username = data.get("name") or email.split("@")[0]
+
+    # Check if user exists
     user = db.query(User).filter_by(email=email).first()
-    if not user:
-        user = User(email=email, username=name, provider=prov, role="user")
-        db.add(user); db.commit(); db.refresh(user)
 
-    token = create_session_token(user.email, user.role)
+    if user:
+        if user.provider != provider:
+            raise HTTPException(
+                status_code=400,
+                detail=f"This email is registered using {user.provider}. Please log in using that method."
+            )
+    else:
+        user = User(
+            email=email,
+            username=username,
+            provider=provider,
+            role="user"
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    # Set session cookie
+    session_token = create_session_token(user.email, user.role)
     response.set_cookie(
-        key=COOKIE_NAME, value=token,
-        httponly=True, secure=True, samesite="None"
+        key=COOKIE_NAME,
+        value=session_token,
+        httponly=True,
+        secure=True,
+        samesite="None"  # Use "Lax" for localhost; "None" for cross-origin/production
     )
-    # return {"success": True, "email": user.email}
-    return {
-            "message": f"Login via {provider} successful",
-            "email": user.email,
-            "role": user.role
-        }
 
-def handle_google(code):
+    return {
+        "message": f"Login via {provider} successful",
+        "email": user.email,
+        "role": user.role
+    }
+
+
+def handle_microsoft(code: str, verifier: Optional[str] = None):
+    data = {
+        "client_id": os.getenv("MICROSOFT_CLIENT_ID"),
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": os.getenv("MICROSOFT_REDIRECT_URI"),
+        "client_secret": os.getenv("MICROSOFT_CLIENT_SECRET"),
+        "scope": "https://graph.microsoft.com/User.Read openid email profile"
+    }
+
+    if verifier:
+        data["code_verifier"] = verifier
+
+    token_url = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+    resp = requests.post(token_url, data=data)
+
+    try:
+        token_data = resp.json()
+    except Exception as e:
+        print("❌ Failed to parse Microsoft token JSON:", e)
+        return None
+
+    print("🔄 Microsoft token response:", token_data)
+
+    access_token = token_data.get("access_token")
+    if not access_token:
+        print("❌ Microsoft access token missing")
+        return None
+
+    # Use token to fetch user profile
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+    }
+
+    user_info_url = "https://graph.microsoft.com/v1.0/me"
+    user_resp = requests.get(user_info_url, headers=headers)
+
+    try:
+        user_data = user_resp.json()
+        print("👤 Microsoft user info:", user_data)
+        return user_data if user_resp.ok else None
+    except Exception as e:
+        print("❌ Failed to parse Microsoft user info JSON:", e)
+        return None
+
+
+def handle_google(code: str):
     resp = requests.post("https://oauth2.googleapis.com/token", data={
         "code": code,
         "client_id": os.getenv("GOOGLE_CLIENT_ID"),
@@ -464,28 +652,14 @@ def handle_google(code):
         "redirect_uri": os.getenv("GOOGLE_REDIRECT_URI"),
         "grant_type": "authorization_code"
     })
-    if not resp.ok:
-        return None
-    idt = resp.json().get("id_token")
-    info = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={idt}")
-    return info.json() if info.ok else None
 
-def handle_microsoft(code, verifier=None):
-    data = {
-        "client_id": os.getenv("MICROSOFT_CLIENT_ID"),
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": os.getenv("MICROSOFT_REDIRECT_URI"),
-        "client_secret": os.getenv("MICROSOFT_CLIENT_SECRET"),
-        "code_verifier": verifier,
-    }
-    # if verifier:
-    #     data["code_verifier"] = verifier
-    # else:
-    #     data["client_secret"] = os.getenv("MICROSOFT_CLIENT_SECRET")
-    resp = requests.post("https://login.microsoftonline.com/common/oauth2/v2.0/token", data=data)
     if not resp.ok:
+        print("❌ Google token fetch failed:", resp.text)
         return None
-    token = resp.json().get("access_token")
-    me = requests.get("https://graph.microsoft.com/v1.0/me", headers={"Authorization": f"Bearer {token}"})
-    return me.json() if me.ok else None
+
+    id_token = resp.json().get("id_token")
+    if not id_token:
+        return None
+
+    info = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}")
+    return info.json() if info.ok else None
