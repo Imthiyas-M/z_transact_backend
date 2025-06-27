@@ -512,6 +512,7 @@ from db.models import User
 from utils.utils import create_session_token
 from db.models import Base
 from db.database import engine
+from services.oauth_service import handle_google, handle_microsoft
 
 Base.metadata.create_all(bind=engine)
 
@@ -596,70 +597,70 @@ def oauth_login(
         "email": user.email,
         "role": user.role
     }
-
-
-def handle_microsoft(code: str, verifier: Optional[str] = None):
-    data = {
-        "client_id": os.getenv("MICROSOFT_CLIENT_ID"),
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": os.getenv("MICROSOFT_REDIRECT_URI"),
-        "client_secret": os.getenv("MICROSOFT_CLIENT_SECRET"),
-        "scope": "https://graph.microsoft.com/User.Read openid email profile"
-    }
-
-    if verifier:
-        data["code_verifier"] = verifier
-
-    token_url = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
-    resp = requests.post(token_url, data=data)
-
-    try:
-        token_data = resp.json()
-    except Exception as e:
-        print("❌ Failed to parse Microsoft token JSON:", e)
-        return None
-
-    print("🔄 Microsoft token response:", token_data)
-
-    access_token = token_data.get("access_token")
-    if not access_token:
-        print("❌ Microsoft access token missing")
-        return None
-
-    # Use token to fetch user profile
-    headers = {
-        "Authorization": f"Bearer {access_token}"
-    }
-
-    user_info_url = "https://graph.microsoft.com/v1.0/me"
-    user_resp = requests.get(user_info_url, headers=headers)
-
-    try:
-        user_data = user_resp.json()
-        print("👤 Microsoft user info:", user_data)
-        return user_data if user_resp.ok else None
-    except Exception as e:
-        print("❌ Failed to parse Microsoft user info JSON:", e)
-        return None
-
-
-def handle_google(code: str):
-    resp = requests.post("https://oauth2.googleapis.com/token", data={
-        "code": code,
-        "client_id": os.getenv("GOOGLE_CLIENT_ID"),
-        "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
-        "redirect_uri": os.getenv("GOOGLE_REDIRECT_URI"),
-        "grant_type": "authorization_code"
-    })
-
-    if not resp.ok:
-        print("❌ Google token fetch failed:", resp.text)
-        return None
-
-    id_token = resp.json().get("id_token")
-    if not id_token:
-        return None
-
-    info = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}")
-    return info.json() if info.ok else None
+#
+#
+# def handle_microsoft(code: str, verifier: Optional[str] = None):
+#     data = {
+#         "client_id": os.getenv("MICROSOFT_CLIENT_ID"),
+#         "grant_type": "authorization_code",
+#         "code": code,
+#         "redirect_uri": os.getenv("MICROSOFT_REDIRECT_URI"),
+#         "client_secret": os.getenv("MICROSOFT_CLIENT_SECRET"),
+#         "scope": "https://graph.microsoft.com/User.Read openid email profile"
+#     }
+#
+#     if verifier:
+#         data["code_verifier"] = verifier
+#
+#     token_url = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+#     resp = requests.post(token_url, data=data)
+#
+#     try:
+#         token_data = resp.json()
+#     except Exception as e:
+#         print("❌ Failed to parse Microsoft token JSON:", e)
+#         return None
+#
+#     print("🔄 Microsoft token response:", token_data)
+#
+#     access_token = token_data.get("access_token")
+#     if not access_token:
+#         print("❌ Microsoft access token missing")
+#         return None
+#
+#     # Use token to fetch user profile
+#     headers = {
+#         "Authorization": f"Bearer {access_token}"
+#     }
+#
+#     user_info_url = "https://graph.microsoft.com/v1.0/me"
+#     user_resp = requests.get(user_info_url, headers=headers)
+#
+#     try:
+#         user_data = user_resp.json()
+#         print("👤 Microsoft user info:", user_data)
+#         return user_data if user_resp.ok else None
+#     except Exception as e:
+#         print("❌ Failed to parse Microsoft user info JSON:", e)
+#         return None
+#
+#
+# def handle_google(code: str):
+#     resp = requests.post("https://oauth2.googleapis.com/token", data={
+#         "code": code,
+#         "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+#         "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+#         "redirect_uri": os.getenv("GOOGLE_REDIRECT_URI"),
+#         "grant_type": "authorization_code"
+#     })
+#
+#     if not resp.ok:
+#         print("❌ Google token fetch failed:", resp.text)
+#         return None
+#
+#     id_token = resp.json().get("id_token")
+#     if not id_token:
+#         return None
+#
+#     info = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}")
+#     return info.json() if info.ok else None

@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 load_dotenv(".env")  # Load your .env file
 
 
+
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -14,7 +15,7 @@ from alembic import context
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 from db.database import Base
-from db.models import *  # Import your models
+from db import models  # Import your models
 target_metadata = Base.metadata
 
 config = context.config
@@ -28,7 +29,6 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = None
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
